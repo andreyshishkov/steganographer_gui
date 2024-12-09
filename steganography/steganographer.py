@@ -1,6 +1,14 @@
 from PIL import Image
 
 
+magic_bytes = {
+    "encryptedLSB": 0x1337c0de,
+    "unencryptedLSB": 0xdeadc0de,
+    "encrypted": 0xbabec0de,
+    "unencrypted": 0x5afec0de
+}
+
+
 def get_file_size_to_bytes(data: bytes) -> bytes:
     """Return size of data in 8 bytes"""
     return len(data).to_bytes(8, byteorder='big')
@@ -29,3 +37,6 @@ def deserialize_data(data: list) -> bytes:
         datum = (data[i] << 6) + (data[i + 1] << 4) + (data[i + 2] << 2) + (data[i + 3] << 0)
         deserialized_data.append(datum)
     return bytes(deserialized_data)
+
+
+
