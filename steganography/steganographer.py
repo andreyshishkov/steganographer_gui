@@ -1,17 +1,22 @@
 from PIL import Image
+import crypto
+from exceptions import MaxFileSizeException
 
 
 magic_bytes = {
     "encryptedLSB": 0x1337c0de,
     "unencryptedLSB": 0xdeadc0de,
-    "encrypted": 0xbabec0de,
-    "unencrypted": 0x5afec0de
 }
 
 
 def get_file_size_to_bytes(data: bytes) -> bytes:
     """Return size of data in 8 bytes"""
     return len(data).to_bytes(8, byteorder='big')
+
+
+def change_last_two_bits(orig_byte: int, new_bits: int) -> int:
+    """Change last two bits of original byte by new bits"""
+    return (orig_byte >> 2) << 2 | new_bits
 
 
 def serialize_data(data: bytes, padding: int = 1):
