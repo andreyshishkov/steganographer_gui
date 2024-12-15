@@ -44,4 +44,55 @@ def deserialize_data(data: list) -> bytes:
     return bytes(deserialized_data)
 
 
+def hide_data_to_image(
+        input_image_path: str,
+        file_to_hide_path: str,
+        output_image_path: str = None,
+        password: str = None,
+) -> None:
+    with open(file_to_hide_path, 'rb') as file:
+        data = file.read()
 
+    image = Image.open(input_image_path).convert('RGB')
+    pixels = image.load()
+
+    if password:
+        data = crypto.encrypt_data(data, password)
+        data = (magic_bytes['encryptedLSB']).to_bytes(4, byteorder='big') \
+               + get_file_size_to_bytes(data) + data
+
+    else:
+        data = (magic_bytes['unencryptedLSB']).to_bytes(4, byteorder='big') \
+               + get_file_size_to_bytes(data) + data
+
+    if len(data) > (image.size[0] * image.size[1] * 6) // 8:
+        raise MaxFileSizeException(
+            'Maximum hidden file size exceeded, to hide this file, choose a bigger resolution'
+        )
+
+    data = serialize_data(data, padding=3)
+    data.reverse()
+
+    image_x, image_y = 0, 0
+    while data:
+        pixel_val = pixels[image_x, image_y]
+
+        pixel_val = (
+            change_last_two_bits(pixel_val[0], data.pop()),
+            change_last_two_bits(pixel_val[1], data.pop()),
+            change_last_two_bits(pixel_val[2], data.pop())
+        )
+
+        pixels[image_x, image_y] = pixel_val
+
+        if image_x == image.size[0] - 1:
+            image_x = 0
+            image_y += 1
+        else:
+            image_x += 1
+
+    if not output_image_path:
+        output_image_path = '.'.join(input_image_path.split('.')[:-1]) + '_with_hidden' \
+                            + '.' + input_image_path.split('.')[-1]
+
+        image.save(output_image_path)
