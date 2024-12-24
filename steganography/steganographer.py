@@ -1,6 +1,6 @@
 from PIL import Image
-import crypto
-from exceptions import MaxFileSizeException
+import steganography.crypto as crypto
+from .exceptions import MaxFileSizeException
 
 
 magic_bytes = {
@@ -38,7 +38,7 @@ def serialize_data(data: bytes, padding: int = 1):
 def deserialize_data(data: list) -> bytes:
     """Takes data and unpacks the 2-bits groups into original'"""
     deserialized_data = list()
-    for i in range(len(data) - 4 + 1, 4):
+    for i in range(0, len(data) - 4 + 1, 4):
         datum = (data[i] << 6) + (data[i + 1] << 4) + (data[i + 2] << 2) + (data[i + 3] << 0)
         deserialized_data.append(datum)
     return bytes(deserialized_data)
@@ -95,4 +95,56 @@ def hide_data_to_image(
         output_image_path = '.'.join(input_image_path.split('.')[:-1]) + '_with_hidden' \
                             + '.' + input_image_path.split('.')[-1]
 
-        image.save(output_image_path)
+    image.save(output_image_path)
+
+
+def extract_data_from_image(input_image_path: str,
+                            output_file_path: str,
+                            password: str = ''
+                            ) -> None:
+    image = Image.open(input_image_path).convert('RGB')
+    pixels = image.load()
+
+    data = []
+    for image_y in range(image.size[1]):
+        for image_x in range(image.size[0]):
+            if len(data) >= 48:
+                break
+
+            pixel = pixels[image_x, image_y]
+
+            data.append(pixel[0] & 0b11)
+            data.append(pixel[1] & 0b11)
+            data.append(pixel[2] & 0b11)
+
+    encrypted = False
+    if deserialize_data(data)[:4] == bytes.fromhex(hex(magic_bytes['unencryptedLSB'])[2:]):
+        print('Hidden file found in image')
+    elif deserialize_data(data)[:4] == bytes.fromhex(hex(magic_bytes['encryptedLSB'])[2:]):
+        print('Hidden file is encrypted')
+        encrypted = True
+    else:
+        print('Image do not have any hidden file')
+        exit()
+
+    hidden_data_size = int.from_bytes(deserialize_data(data)[4:16], byteorder='big') * 4
+
+    data = []
+    for image_y in range(image.size[1]):
+        for image_x in range(image.size[0]):
+            if len(data) >= hidden_data_size + 48:
+                break
+
+            pixel = pixels[image_x, image_y]
+
+            data.append(pixel[0] & 0b11)
+            data.append(pixel[1] & 0b11)
+            data.append(pixel[2] & 0b11)
+
+    data = deserialize_data(data[48:])
+    if encrypted:
+        data = crypto.decrypt_data(data, password)
+
+    with open(output_file_path, 'wb') as file:
+        file.write(data)
+    print('Extracting is successful')
